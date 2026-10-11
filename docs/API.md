@@ -101,3 +101,6 @@ Content-Type: application/json
 删除为可恢复回收：`DELETE /api/materials/{id}`；恢复为 `POST /api/materials/{id}/restore`。永久删除需 `/purge` 的当前 revision 和确认文字；批量接口同样逐条检查修订、文件归属和哈希。不要绕过预览/确认直接操作数据库或知识库文件。
 
 `POST /api/materials/batch-actions` 的 `action` 支持 `trash/restore/purge/retry`，每请求1–100个 `{id,revision}`；界面把更大选择分批提交。重试返回逐条 `job_id` 与 `kind`（`images`或`collect`），完整条目为 `skipped`，已在队列为 `duplicate`；这些是排队回执，不是采集成功。重试不能写第一层快照或回收条目。`/api/accounts` 的 `access_required` 表示上次平台拒绝尚待本人处理，即使已保存Cookie也不表示权限可用；保存或导入最新单平台状态后允许下一次读取核验。
+
+
+默认摘要更新（2026-10-11）：打开已取得文字的材料即显示本机摘要，无需模型或API。脚本从完整已采集正文/字幕选取原句，保留开头主体并选取后文关键句，短帖保留短原文；这是提取式摘要，不能保证概括每个重点，图片文字不猜测、缺正文不以标题冒充。部分内容明确标记。只有主动点“AI 优化”才调用本人配置的模型，摘要不进入后续批注整理或知识库导出。此规则覆盖此前“原文导读默认收起”的界面说明。

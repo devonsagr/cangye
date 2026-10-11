@@ -21,12 +21,11 @@ def opening(block):
 
 @lru_cache(maxsize=1024)
 def extract(text):
-    if len(text)<120:return None
     # Keep the first substantive paragraph and its adjacent context together.
     # Repeated dates/platform names must not replace the subject with two scattered lines.
     blocks=[b.strip() for b in re.split(r'\n\s*\n',text) if b.strip()]
     if len(blocks)==1:blocks=[b.strip() for b in text.splitlines() if b.strip()]
-    blocks=[b for b in blocks if len(b)>=12 and not NOISE.fullmatch(b)]
+    blocks=[b for b in blocks if not NOISE.fullmatch(b)]
     first=next((i for i,b in enumerate(blocks) if not FRAGMENT.search(b) and opening(b)),None)
     if first is None:return None
     selected=[opening(blocks[first])]
@@ -40,10 +39,39 @@ def make(item):
     content=item.get('content',{})
     if content.get('media_kind')=='video_reference':return None
     if content.get('segments') and item.get('platform') in ('bilibili','youtube','douyin'):
-        text='\n'.join(s['text'] for s in content['segments'])[:24000];source='字幕导读'
-    else:text=plain(item.get('body',''))[:24000];source='原文导读'
-    result=extract(text)
-    return {'text':result,'method':'extractive','source':source,'reading_only':True,'model_used':False} if result else None
+        text='\n'.join(s['text'] for s in content['segments']);source='字幕'
+    else:text=plain(item.get('body',''));source='原文'
+    result=local_summary(text)
+    if not result:return None
+    return {'text':result,'method':'extractive','source':source,'reading_only':True,'model_used':False,
+            'basis':'已取得的部分文字' if item.get('collection') in ('partial','failed','queued','running','paused') else '已取得的文字'}
+
+@lru_cache(maxsize=512)
+def local_summary(text):
+    """Extract complete source sentences in order; no network or invented wording."""
+    sentences=[s.strip() for s in re.findall(r'[^。！？!?\n]+[。！？!?]+|[^。！？!?\n]+(?:\n|$)',text)]
+    sentences=[s for s in sentences if s and not NOISE.fullmatch(s)]
+    # Keep the subject at the start, then choose key statements across the source.
+    first=next((i for i,s in enumerate(sentences) if not FRAGMENT.search(s)),None)
+    if first is None:return None
+    if len(text)<=480:return '\n'.join(sentences[first:])
+    chosen={first}
+    if first+1<len(sentences):chosen.add(first+1)
+    conclusion=re.compile(r'结论|总结|因此|所以|最终|建议|关键|核心|结果|需要|必须|conclusion|therefore|recommend|important',re.I)
+    remaining=list(range(first+2,len(sentences)))
+    if remaining:
+        # Include middle and ending evidence, even after a long transcript's first 24k.
+        for start,end in ((first+2,(first+len(sentences))//2),((first+len(sentences))//2,len(sentences))):
+            candidates=[i for i in range(max(first+2,start),end) if not FRAGMENT.search(sentences[i])]
+            if candidates:chosen.add(max(candidates,key=lambda i:(bool(conclusion.search(sentences[i])),i if end==len(sentences) else -i)))
+    output=[];size=0
+    for i in sorted(chosen):
+        sentence=sentences[i]
+        if size+len(sentence)>640:
+            if not output:output.append(sentence[:480]+'…')
+            continue
+        output.append(sentence);size+=len(sentence)
+    return '\n'.join(output) or None
 
 def excerpt(item):
     preview=make(item)

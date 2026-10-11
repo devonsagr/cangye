@@ -110,3 +110,6 @@ Get-ChildItem tests -Filter *.test.cjs | ForEach-Object { node $_.FullName }
 设计思路参考 [Firecrawl](https://github.com/firecrawl/firecrawl)、[Agent-Reach](https://github.com/Panniantong/Agent-Reach) 的提取与适配方式；浏览器页面结构研究参考 [BetterXiaoHeiHe](https://github.com/k1m0206/better-XiaoHeiHe)。这些项目不是对所有平台采集成功的承诺，本项目也不是它们的官方分支。
 
 本项目代码采用 [MIT License](LICENSE)。平台内容仍属于原作者，依赖包按各自许可证使用；MIT 许可不授予平台内容的转载权或规避访问限制的权利。
+
+
+默认摘要更新（2026-10-11）：打开已取得文字的材料即显示本机摘要，无需模型或API。脚本从完整已采集正文/字幕选取原句，保留开头主体并选取后文关键句，短帖保留短原文；这是提取式摘要，不能保证概括每个重点，图片文字不猜测、缺正文不以标题冒充。部分内容明确标记。只有主动点“AI 优化”才调用本人配置的模型，摘要不进入后续批注整理或知识库导出。此规则覆盖此前“原文导读默认收起”的界面说明。

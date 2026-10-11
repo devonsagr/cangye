@@ -11,7 +11,7 @@ def test_preview_uses_original_sentences_without_model_or_notes():
     assert all(sentence in TEXT for sentence in r['text'].splitlines())
 
 def test_short_posts_and_video_references_do_not_get_fake_summaries():
-    assert reading_preview.make({'body':'短帖直接阅读原文。','content':{}}) is None
+    assert reading_preview.make({'body':'短帖直接阅读原文。','content':{}})['text']=='短帖直接阅读原文。'
     assert reading_preview.make({'body':TEXT,'content':{'media_kind':'video_reference'}}) is None
 
 def test_gallery_does_not_hide_the_list_excerpt():
@@ -34,8 +34,24 @@ def test_context_is_kept_instead_of_picking_repeated_dates_and_platform_fragment
     result=reading_preview.make({'body':text,'content':{}})
     assert result['text'].startswith('《合成冒险》')
     assert '发行计划' in result['text'] and '协作模式' in result['text']
-    assert result['source']=='原文导读' and not result['model_used']
+    assert result['source']=='原文' and not result['model_used']
 
 def test_fragments_and_ui_noise_do_not_become_a_fake_subject():
     text='收藏 123\n\n也将登陆Switch平台，发布日期会稍后公布。\n\n此外会推出新的音乐版本，更多信息将在后续公布。'*3
     assert reading_preview.make({'body':text,'content':{}}) is None
+
+def test_default_summary_covers_long_transcript_tail_without_network(monkeypatch):
+    import socket
+    monkeypatch.setattr(socket,'create_connection',lambda *a,**k:(_ for _ in ()).throw(AssertionError('local summary must not connect')))
+    lines=['这段视频介绍怎样保护材料原文和自己的备注。','首先需要保存对应来源，防止后续处理丢失依据。']
+    lines+=['中间展示一个完整的保存步骤，并说明文档的组织方式。']*1600
+    lines+=['最终结论是整理必须以原文和本人备注为依据，不用自动摘要代替理解。']
+    item={'platform':'bilibili','body':'仅有的视频简介，不是字幕。','notes':'我的秘密批注','content':{'segments':[{'text':t,'start':i,'end':i+1} for i,t in enumerate(lines)]},'collection':'partial'}
+    result=reading_preview.make(item)
+    assert '最终结论' in result['text'] and result['text'].startswith(lines[0])
+    assert all(s in lines for s in result['text'].splitlines())
+    assert '秘密批注' not in result['text'] and '视频简介' not in result['text']
+    assert result['model_used'] is False and '部分' in result['basis'] and result['source']=='字幕'
+
+def test_image_only_and_title_only_cannot_invent_a_default_summary():
+    assert reading_preview.make({'title':'只有标题','body':'![图片](images/a.png)','content':{}}) is None
